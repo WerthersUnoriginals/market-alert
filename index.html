@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Market Alert System · Sistema de Alerta de Mercado</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  /* ── RESET & BASE ─────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy:       #08111F;
+    --navy-mid:   #0D1E3A;
+    --navy-light: #0D2D5E;
+    --blue:       #185FA5;
+    --blue-lite:  #5BA8F5;
+    --teal:       #0A4A3A;
+    --teal-lite:  #0F9B78;
+    --gold:       #C9960C;
+    --gold-lite:  #EF9F27;
+    --red:        #A32D2D;
+    --red-lite:   #E24B4A;
+    --amber:      #854F0B;
+    --amber-lite: #F59E0B;
+    --green:      #166534;
+    --green-lite: #22C55E;
+    --grey:       #4A5568;
+    --grey-mid:   #8BA3C7;
+    --grey-lite:  #C8D8EE;
+    --white:      #F0F4FA;
+
+    --phase-0: #22C55E;
+    --phase-1: #84CC16;
+    --phase-2: #F59E0B;
+    --phase-3: #EF9F27;
+    --phase-4: #E24B4A;
+
+    --font-display: 'Syne', sans-serif;
+    --font-mono:    'Space Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--navy);
+    color: var(--white);
+    font-family: var(--font-display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── ANIMATED BACKGROUND GRID ────────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(91,168,245,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,168,245,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── HEADER ──────────────────────────────────────────────────────── */
+  header {
+    position: relative;
+    z-index: 10;
+    border-bottom: 1px solid rgba(91,168,245,0.15);
+    background: linear-gradient(180deg, rgba(13,45,94,0.9) 0%, rgba(8,17,31,0.6) 100%);
+    backdrop-filter: blur(12px);
+    padding: 0 2rem;
+  }
+
+  .header-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    gap: 1rem;
+  }
+
+  .logo-block {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--teal-lite), var(--blue-lite));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .logo-text {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+
+  .logo-title {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.08em;
+    color: var(--white);
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--grey-mid);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .header-meta {
+    display: flex; align-items: center; gap: 1.5rem;
+  }
+
+  .last-update {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--grey-mid);
+    letter-spacing: 0.06em;
+  }
+
+  .last-update span { color: var(--teal-lite); }
+
+  .refresh-btn {
+    background: rgba(15,155,120,0.12);
+    border: 1px solid rgba(15,155,120,0.3);
+    color: var(--teal-lite);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .refresh-btn:hover {
+    background: rgba(15,155,120,0.25);
+    border-color: var(--teal-lite);
+  }
+  .refresh-btn.spinning svg { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── MAIN LAYOUT ─────────────────────────────────────────────────── */
+  main {
+    position: relative; z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* ── HERO ROW: GAUGE + PHASE INFO ────────────────────────────────── */
+  .hero-row {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  /* ── GAUGE CARD ──────────────────────────────────────────────────── */
+  .gauge-card {
+    background: linear-gradient(145deg, var(--navy-mid), rgba(13,45,94,0.6));
+    border: 1px solid rgba(91,168,245,0.12);
+    border-radius: 16px;
+    padding: 2rem 1.5rem 1.5rem;
+    display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    position: relative; overflow: hidden;
+  }
+
+  .gauge-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--teal-lite), transparent);
+  }
+
+  .gauge-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+  }
+
+  .gauge-wrap {
+    position: relative;
+    width: 220px; height: 136px;
+  }
+
+  .gauge-svg { width: 100%; height: 100%; overflow: visible; }
+
+  .gauge-score {
+    position: absolute;
+    bottom: 4px; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .gauge-score .score-num {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 48px;
+    line-height: 1;
+    transition: color 0.5s;
+  }
+
+  .gauge-score .score-denom {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--grey-mid);
+  }
+
+  .phase-badge {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid;
+    width: 100%;
+    transition: all 0.5s;
+  }
+
+  .phase-badge .phase-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    opacity: 0.7;
+  }
+
+  .phase-badge .phase-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .phase-badge .phase-desc {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    opacity: 0.65;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .signals-row {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    width: 100%;
+  }
+
+  .signal-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    transition: background 0.4s;
+  }
+
+  /* ── PHASE INFO PANEL ────────────────────────────────────────────── */
+  .phase-info {
+    background: linear-gradient(145deg, var(--navy-mid), rgba(13,45,94,0.4));
+    border: 1px solid rgba(91,168,245,0.12);
+    border-radius: 16px;
+    padding: 1.75rem;
+    display: flex; flex-direction: column; gap: 1.25rem;
+  }
+
+  .phase-info-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+
+  .phase-info-title {
+    font-weight: 800; font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .phase-info-title span { color: var(--teal-lite); }
+
+  .phase-timeline {
+    display: flex; gap: 0;
+    border: 1px solid rgba(91,168,245,0.15);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .phase-step {
+    flex: 1;
+    padding: 8px 4px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    border-right: 1px solid rgba(91,168,245,0.1);
+    cursor: default;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .phase-step:last-child { border-right: none; }
+
+  .phase-step.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .phase-step .ps-num { font-size: 13px; font-weight: 700; display: block; margin-bottom: 2px; }
+  .phase-step .ps-name { opacity: 0.65; font-size: 8px; }
+
+  .action-box {
+    background: rgba(8,17,31,0.6);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+
+  .action-box-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+  }
+
+  .action-box-text {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--grey-lite);
+  }
+
+  .key-levels {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .key-level {
+    background: rgba(8,17,31,0.5);
+    border-radius: 8px;
+    padding: 10px;
+    border: 1px solid rgba(91,168,245,0.08);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+
+  .kl-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--grey-mid);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .kl-value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .kl-sub {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    opacity: 0.6;
+  }
+
+  /* ── INDICATORS TABLE ────────────────────────────────────────────── */
+  .section-header {
+    display: flex; align-items: center; gap: 12px;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(91,168,245,0.1);
+  }
+
+  .section-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--teal-lite);
+    letter-spacing: 0.1em;
+  }
+
+  .section-title {
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+  }
+
+  .section-title-en {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--grey-mid);
+    letter-spacing: 0.08em;
+    margin-left: auto;
+  }
+
+  .indicators-grid {
+    display: flex; flex-direction: column; gap: 8px;
+  }
+
+  /* Table header */
+  .ind-table-head {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1.2fr 0.8fr;
+    gap: 0;
+    padding: 8px 16px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+    border-bottom: 1px solid rgba(91,168,245,0.1);
+  }
+
+  /* Indicator row */
+  .ind-row {
+    display: grid;
+    grid-template-columns: 2fr 1.2fr 1.2fr 1fr 1.2fr 0.8fr;
+    gap: 0;
+    padding: 14px 16px;
+    background: linear-gradient(90deg, rgba(13,30,58,0.7), rgba(13,30,58,0.3));
+    border: 1px solid rgba(91,168,245,0.08);
+    border-radius: 10px;
+    align-items: center;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    cursor: default;
+    animation: rowIn 0.4s ease both;
+  }
+
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .ind-row:hover {
+    background: linear-gradient(90deg, rgba(13,45,94,0.8), rgba(13,30,58,0.5));
+    border-color: rgba(91,168,245,0.2);
+  }
+
+  .ind-row::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+    transition: background 0.4s;
+  }
+
+  /* Status colors */
+  .status-green  { --status-color: var(--green-lite);  }
+  .status-yellow { --status-color: var(--phase-1);     }
+  .status-amber  { --status-color: var(--amber-lite);  }
+  .status-red    { --status-color: var(--red-lite);    }
+
+  .ind-row::before { background: var(--status-color, var(--grey)); }
+
+  /* Column cells */
+  .ind-name { display: flex; flex-direction: column; gap: 3px; padding-left: 8px; }
+  .ind-name-es { font-weight: 700; font-size: 13px; }
+  .ind-name-en { font-family: var(--font-mono); font-size: 9px; color: var(--grey-mid); letter-spacing: 0.06em; }
+
+  .ind-value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  .ind-threshold {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--grey-mid);
+  }
+
+  .ind-trend {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    display: flex; align-items: center; gap: 4px;
+  }
+
+  .ind-status {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 1px solid;
+    width: fit-content;
+  }
+
+  .status-pill .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .pill-green  { background: rgba(34,197,94,0.1);  border-color: rgba(34,197,94,0.3);  color: var(--green-lite);  }
+  .pill-green  .dot { background: var(--green-lite); }
+  .pill-yellow { background: rgba(132,204,22,0.1);  border-color: rgba(132,204,22,0.3); color: var(--phase-1);    }
+  .pill-yellow .dot { background: var(--phase-1); }
+  .pill-amber  { background: rgba(245,158,11,0.1);  border-color: rgba(245,158,11,0.3); color: var(--amber-lite); }
+  .pill-amber  .dot { background: var(--amber-lite); }
+  .pill-red    { background: rgba(226,75,74,0.1);   border-color: rgba(226,75,74,0.3);  color: var(--red-lite);   }
+  .pill-red    .dot { background: var(--red-lite); animation: pulse-red 1.5s infinite; }
+
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(226,75,74,0.4); }
+    50%       { opacity: 0.6; box-shadow: 0 0 0 4px rgba(226,75,74,0); }
+  }
+
+  .ind-score-dot {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 12px;
+    border: 2px solid;
+    margin: 0 auto;
+    transition: all 0.4s;
+  }
+
+  .dot-active   { background: rgba(226,75,74,0.15); border-color: var(--red-lite);   color: var(--red-lite);   }
+  .dot-amber    { background: rgba(245,158,11,0.15); border-color: var(--amber-lite); color: var(--amber-lite); }
+  .dot-inactive { background: rgba(34,197,94,0.1);  border-color: rgba(34,197,94,0.3);color: var(--green-lite);}
+
+  /* ── SUMMARY STATS ───────────────────────────────────────────────── */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+  }
+
+  .stat-card {
+    background: linear-gradient(145deg, var(--navy-mid), rgba(13,45,94,0.4));
+    border: 1px solid rgba(91,168,245,0.1);
+    border-radius: 12px;
+    padding: 1.1rem 1.25rem;
+    display: flex; flex-direction: column; gap: 4px;
+    position: relative; overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .stat-card:hover { border-color: rgba(91,168,245,0.25); }
+
+  .stat-label {
+    font-family: var(--font-mono);
+    font-size: 8.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--grey-mid);
+    line-height: 1.4;
+  }
+
+  .stat-label-en {
+    font-family: var(--font-mono);
+    font-size: 7.5px;
+    color: rgba(139,163,199,0.45);
+    margin-top: -1px;
+    margin-bottom: 4px;
+  }
+
+  .stat-value {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 22px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    transition: color 0.4s;
+  }
+
+  .stat-change {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    display: flex; align-items: center; gap: 4px;
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+
+  /* ── FOOTER ──────────────────────────────────────────────────────── */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid rgba(91,168,245,0.08);
+    padding: 1rem 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-text {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--grey);
+    letter-spacing: 0.08em;
+  }
+
+  .footer-text span { color: var(--teal-lite); }
+
+  /* ── LOADING OVERLAY ─────────────────────────────────────────────── */
+  #loading {
+    position: fixed; inset: 0;
+    background: var(--navy);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 1.5rem;
+    z-index: 1000;
+    transition: opacity 0.5s;
+  }
+
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  .loading-logo {
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 0.08em;
+    color: var(--teal-lite);
+  }
+
+  .loading-bar-wrap {
+    width: 260px; height: 3px;
+    background: rgba(91,168,245,0.1);
+    border-radius: 2px; overflow: hidden;
+  }
+
+  .loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--teal-lite), var(--blue-lite));
+    border-radius: 2px;
+    animation: loadBar 1.6s ease-in-out forwards;
+  }
+
+  @keyframes loadBar {
+    from { width: 0%; }
+    to   { width: 100%; }
+  }
+
+  .loading-msg {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--grey-mid);
+    letter-spacing: 0.1em;
+    animation: blink 1s step-start infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── RESPONSIVE ──────────────────────────────────────────────────── */
+
+  /* ── CHART CARDS ─────────────────────────────────────────────────── */
+  .chart-card {
+    background: linear-gradient(145deg, var(--navy-mid), rgba(13,45,94,0.4));
+    border: 1px solid rgba(91,168,245,0.1);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex; flex-direction: column; gap: 1rem;
+    position: relative; overflow: hidden;
+  }
+
+  .chart-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(15,155,120,0.4), transparent);
+  }
+
+  .chart-card--wide { width: 100%; }
+
+  .chart-card-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    flex-wrap: wrap; gap: 8px;
+  }
+
+  .chart-card-title {
+    font-weight: 700; font-size: 13px; color: var(--white);
+    margin-bottom: 2px;
+  }
+
+  .chart-card-sub {
+    font-family: var(--font-mono); font-size: 8.5px;
+    color: var(--grey-mid); letter-spacing: 0.06em;
+  }
+
+  .chart-legend {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+
+  .leg-item {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--font-mono); font-size: 8.5px; color: var(--grey-mid);
+  }
+
+  .leg-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+
+  .chart-container { position: relative; width: 100%; }
+  .chart-container--tall { height: 220px; }
+  .chart-container--mini { height: 140px; }
+
+  /* ── MINI CHARTS GRID ────────────────────────────────────────────── */
+  .mini-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .mini-chart-card {
+    background: linear-gradient(145deg, var(--navy-mid), rgba(13,45,94,0.35));
+    border: 1px solid rgba(91,168,245,0.08);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: border-color 0.2s;
+  }
+
+  .mini-chart-card:hover { border-color: rgba(91,168,245,0.2); }
+
+  .mini-chart-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+
+  .mini-chart-name {
+    font-weight: 700; font-size: 11px; color: var(--white); line-height: 1.3;
+  }
+
+  .mini-chart-name-en {
+    font-family: var(--font-mono); font-size: 7.5px;
+    color: var(--grey-mid); margin-top: 2px; letter-spacing: 0.04em;
+  }
+
+  .mini-chart-val {
+    font-family: var(--font-mono); font-weight: 700; font-size: 14px;
+    text-align: right; line-height: 1;
+  }
+
+  .mini-chart-threshold {
+    font-family: var(--font-mono); font-size: 7px;
+    color: var(--grey-mid); text-align: right; margin-top: 2px;
+  }
+
+  @media (max-width: 900px) {
+    .mini-charts-grid { grid-template-columns: repeat(2, 1fr); }
+    .chart-container--tall { height: 180px; }
+  }
+
+  @media (max-width: 560px) {
+    .mini-charts-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 900px) {
+    .hero-row { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2,1fr); }
+    .ind-table-head,
+    .ind-row { grid-template-columns: 2fr 1fr 1fr 1fr; }
+    .ind-row > *:nth-child(5),
+    .ind-row > *:nth-child(6),
+    .ind-table-head > *:nth-child(5),
+    .ind-table-head > *:nth-child(6) { display: none; }
+    main { padding: 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOADING OVERLAY -->
+<div id="loading">
+  <div class="loading-logo">⬡ MARKET ALERT SYSTEM</div>
+  <div class="loading-bar-wrap"><div class="loading-bar"></div></div>
+  <div class="loading-msg">CARGANDO INDICADORES · LOADING INDICATORS...</div>
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <div class="logo-block">
+      <div class="logo-icon">⬡</div>
+      <div class="logo-text">
+        <div class="logo-title">MARKET ALERT SYSTEM</div>
+        <div class="logo-sub">Sistema de Alerta de Mercado · v1.0</div>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div class="last-update" id="updateTime">
+        Última actualización · Last update: <span>--:--</span>
+      </div>
+      <button class="refresh-btn" id="refreshBtn" onclick="loadData()">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M1 4v6h6M23 20v-6h-6"/>
+          <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/>
+        </svg>
+        REFRESH
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── HERO ROW ──────────────────────────────────────────────────── -->
+  <div class="hero-row">
+
+    <!-- GAUGE -->
+    <div class="gauge-card">
+      <div class="gauge-label">FASE DEL SISTEMA · SYSTEM PHASE</div>
+
+      <div class="gauge-wrap">
+        <!--
+          Perfect semicircle gauge:
+          Centre = (110, 118), Radius = 88
+          Angles: 180° (left) → 0° (right), sweeping anticlockwise in SVG coords
+          Point on arc: x = 110 + 88·cos(θ),  y = 118 - 88·sin(θ)
+          θ=180° → (22, 118)   θ=144° → (39.2, 69.7)  θ=108° → (82.8, 35.6)
+          θ=72°  → (137.2,35.6) θ=36° → (180.8,69.7) θ=0°  → (198, 118)
+          5 equal segments of 36° each (180°/5)
+        -->
+        <svg class="gauge-svg" viewBox="0 0 220 136" fill="none">
+          <!-- Background track -->
+          <path d="M22 118 A88 88 0 0 1 198 118"
+                stroke="rgba(91,168,245,0.08)" stroke-width="14" stroke-linecap="butt" fill="none"/>
+
+          <!-- Segment 0 — Verde  180°→144° -->
+          <path d="M22 118 A88 88 0 0 1 39.2 69.7"
+                stroke="var(--phase-0)" stroke-width="13" stroke-linecap="butt" fill="none" opacity="0.35"/>
+          <!-- Segment 1 — Lime   144°→108° -->
+          <path d="M39.2 69.7 A88 88 0 0 1 82.8 35.6"
+                stroke="var(--phase-1)" stroke-width="13" stroke-linecap="butt" fill="none" opacity="0.35"/>
+          <!-- Segment 2 — Amber  108°→72° -->
+          <path d="M82.8 35.6 A88 88 0 0 1 137.2 35.6"
+                stroke="var(--phase-2)" stroke-width="13" stroke-linecap="butt" fill="none" opacity="0.35"/>
+          <!-- Segment 3 — Orange  72°→36° -->
+          <path d="M137.2 35.6 A88 88 0 0 1 180.8 69.7"
+                stroke="var(--phase-3)" stroke-width="13" stroke-linecap="butt" fill="none" opacity="0.35"/>
+          <!-- Segment 4 — Red    36°→0° -->
+          <path d="M180.8 69.7 A88 88 0 0 1 198 118"
+                stroke="var(--phase-4)" stroke-width="13" stroke-linecap="butt" fill="none" opacity="0.35"/>
+
+          <!-- Thin separator ticks between segments -->
+          <line x1="39.2"  y1="69.7"  x2="36.8"  y2="64.5"  stroke="var(--navy-mid)" stroke-width="3"/>
+          <line x1="82.8"  y1="35.6"  x2="79.8"  y2="30.8"  stroke="var(--navy-mid)" stroke-width="3"/>
+          <line x1="137.2" y1="35.6"  x2="140.2" y2="30.8"  stroke="var(--navy-mid)" stroke-width="3"/>
+          <line x1="180.8" y1="69.7"  x2="183.2" y2="64.5"  stroke="var(--navy-mid)" stroke-width="3"/>
+
+          <!-- Needle — pivots at (110, 118), length 80px -->
+          <line id="needle"
+                x1="110" y1="118"
+                x2="110" y2="38"
+                stroke="white" stroke-width="2.5" stroke-linecap="round"
+                style="transform-origin:110px 118px; transform:rotate(0deg);
+                       transition:transform 1.2s cubic-bezier(.34,1.4,.64,1)"/>
+          <!-- Needle base cap -->
+          <circle cx="110" cy="118" r="6" fill="var(--navy-mid)" stroke="white" stroke-width="2"/>
+          <circle cx="110" cy="118" r="3" fill="white"/>
+        </svg>
+
+        <div class="gauge-score">
+          <span class="score-num" id="gaugeScore" style="color: var(--amber-lite)">4</span>
+          <span class="score-denom">/7</span>
+        </div>
+      </div>
+
+      <div class="phase-badge" id="phaseBadge"
+           style="background:rgba(245,158,11,0.08); border-color:rgba(245,158,11,0.3); color:var(--amber-lite)">
+        <span class="phase-num" id="phaseNum">FASE 2 · PHASE 2</span>
+        <span class="phase-name" id="phaseName">ALERTA · ALERT</span>
+        <span class="phase-desc" id="phaseDesc">4-5 indicadores activos · Reducir exposición 25-40%</span>
+      </div>
+
+      <div class="signals-row" id="signalDots"></div>
+    </div>
+
+    <!-- PHASE INFO -->
+    <div class="phase-info">
+      <div class="phase-info-header">
+        <div>
+          <div style="font-family:var(--font-mono);font-size:9px;color:var(--grey-mid);letter-spacing:.1em;margin-bottom:6px;">
+            ESTADO MACRO · MACRO STATUS
+          </div>
+          <div class="phase-info-title">
+            Sistema en <span id="phaseNameInline">Alerta</span> —<br>
+            5 de 7 señales activas
+          </div>
+        </div>
+        <div style="font-family:var(--font-mono);font-size:10px;color:var(--grey-mid);text-align:right;">
+          S&P 500<br>
+          <span style="color:var(--blue-lite);font-size:18px;font-weight:700;">7,460</span><br>
+          <span style="color:var(--green-lite);font-size:10px;">▲ +16% vs MM25</span>
+        </div>
+      </div>
+
+      <!-- Phase timeline -->
+      <div class="phase-timeline" id="phaseTimeline"></div>
+
+      <!-- Action box -->
+      <div class="action-box">
+        <div class="action-box-label">Acción sugerida · Suggested action</div>
+        <div class="action-box-text" id="actionText">
+          Reducir exposición a renta variable un 25-40%. Incrementar posición en oro y activos defensivos (utilities, salud). Mantener liquidez para reentrar en la corrección. Monitorizar HY spreads y curva de tipos semanalmente.
+        </div>
+      </div>
+
+      <!-- Key levels -->
+      <div class="key-levels">
+        <div class="key-level">
+          <div class="kl-label">Resistencia · Resistance</div>
+          <div class="kl-value" style="color:var(--red-lite)">8,200</div>
+          <div class="kl-sub">Techo potencial del ciclo</div>
+        </div>
+        <div class="key-level">
+          <div class="kl-label">MM25 mensual · MA25M</div>
+          <div class="kl-value" style="color:var(--gold-lite)">6,440</div>
+          <div class="kl-sub">Línea roja del sistema</div>
+        </div>
+        <div class="key-level">
+          <div class="kl-label">Soporte B · Support B</div>
+          <div class="kl-value" style="color:var(--amber-lite)">5,968</div>
+          <div class="kl-sub">Corrección -20% potencial</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── STATS ROW ──────────────────────────────────────────────────── -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Indicadores en alerta</div>
+      <div class="stat-label-en">Indicators in alert</div>
+      <div class="stat-value" id="statAlerts" style="color:var(--amber-lite)">5</div>
+      <div class="stat-change" style="color:var(--red-lite)">▲ +1 vs semana anterior</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Puntuación del sistema</div>
+      <div class="stat-label-en">System score</div>
+      <div class="stat-value" id="statScore" style="color:var(--amber-lite)">4/7</div>
+      <div class="stat-change" style="color:var(--grey-mid)">— Sin cambio esta semana</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Curva de tipos 2Y-10Y</div>
+      <div class="stat-label-en">Yield Curve spread</div>
+      <div class="stat-value" id="statYield" style="color:var(--amber-lite)">+0.6%</div>
+      <div class="stat-change" style="color:var(--green-lite)">▲ Normalizando (desinversión)</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Spread HY crédito</div>
+      <div class="stat-label-en">HY Credit spread</div>
+      <div class="stat-value" id="statHY" style="color:var(--amber-lite)">5.2%</div>
+      <div class="stat-change" style="color:var(--red-lite)">▲ Ampliándose vs 3.8% de 2024</div>
+    </div>
+  </div>
+
+  <!-- ── INDICATORS TABLE ───────────────────────────────────────────── -->
+  <div>
+    <div class="section-header">
+      <span class="section-num">01</span>
+      <span class="section-title">Indicadores del sistema · System Indicators</span>
+      <span class="section-title-en">7 LEADING INDICATORS · MAYO 2026</span>
+    </div>
+  </div>
+
+  <div class="indicators-grid">
+    <div class="ind-table-head">
+      <span style="padding-left:8px">Indicador · Indicator</span>
+      <span>Valor · Value</span>
+      <span>Umbral · Threshold</span>
+      <span>Tendencia · Trend</span>
+      <span>Estado · Status</span>
+      <span style="text-align:center">Score</span>
+    </div>
+    <div id="indicatorsContainer"></div>
+  </div>
+
+  <!-- ── SECTION 02: AGGREGATE CHART ─────────────────────────────── -->
+  <div>
+    <div class="section-header">
+      <span class="section-num">02</span>
+      <span class="section-title">Puntuación agregada histórica · Historical System Score</span>
+      <span class="section-title-en">SCORE 0-7 vs S&P 500 · 2010–2026</span>
+    </div>
+  </div>
+
+  <div class="chart-card chart-card--wide">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title">Sistema de Alerta vs S&amp;P 500</div>
+        <div class="chart-card-sub">Puntuación 0-7 superpuesta al índice · Zonas rojas = episodios de corrección histórica</div>
+      </div>
+      <div class="chart-legend">
+        <span class="leg-item"><span class="leg-dot" style="background:var(--teal-lite)"></span>Score sistema</span>
+        <span class="leg-item"><span class="leg-dot" style="background:var(--blue-lite)"></span>S&amp;P 500</span>
+        <span class="leg-item"><span style="display:inline-block;width:12px;height:8px;background:rgba(226,75,74,0.3);border-radius:2px;flex-shrink:0"></span><span style="margin-left:5px">Crisis</span></span>
+      </div>
+    </div>
+    <div class="chart-container chart-container--tall">
+      <canvas id="aggregateChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ── SECTION 03: MINI CHARTS GRID ─────────────────────────────── -->
+  <div>
+    <div class="section-header">
+      <span class="section-num">03</span>
+      <span class="section-title">Evolución histórica por indicador · Historical per Indicator</span>
+      <span class="section-title-en">2010–2026 · UMBRAL DE ALERTA EN ROJO DISCONTINUO</span>
+    </div>
+  </div>
+
+  <div class="mini-charts-grid" id="miniChartsGrid"></div>
+
+
+</main>
+
+<footer>
+  <div class="footer-text">
+    MARKET ALERT SYSTEM · Uso personal · Personal use only ·
+    Datos: <span>FRED · Yahoo Finance · CBOE</span>
+  </div>
+  <div class="footer-text">
+    v1.0 · <span id="footerDate">Mayo 2026</span> · No constituye asesoramiento de inversión
+  </div>
+</footer>
+
+<script>
+// ── DATA MODEL ─────────────────────────────────────────────────────────────
+const PHASES = [
+  { id:0, name:'Normal',    nameEn:'Normal',    color:'var(--phase-0)', score:[0,1],
+    desc:'0-1 activos · Mercado sano',
+    action:'Posición normal en renta variable. Sistema sin señales de alerta relevantes.' },
+  { id:1, name:'Pre-Alerta',nameEn:'Pre-Alert', color:'var(--phase-1)', score:[2,3],
+    desc:'2-3 activos · Señales tempranas',
+    action:'Reducir exposición 10-15%. Incrementar liquidez. Monitorizar indicadores semanalmente.' },
+  { id:2, name:'Alerta',    nameEn:'Alert',     color:'var(--phase-2)', score:[4,5],
+    desc:'4-5 activos · Reducir exposición 25-40%',
+    action:'Reducir exposición a renta variable 25-40%. Incrementar oro y defensivos. Mantener liquidez táctica.' },
+  { id:3, name:'Riesgo Alto',nameEn:'High Risk', color:'var(--phase-3)', score:[6,6],
+    desc:'6 activos · Exposición mínima',
+    action:'Exposición mínima a renta variable. Máxima protección. Oro, bonos cortos, liquidez.' },
+  { id:4, name:'Crisis',    nameEn:'Crisis',    color:'var(--phase-4)', score:[7,7],
+    desc:'7 activos · Modo defensivo total',
+    action:'Cash y oro. Búsqueda de punto de capitulación para reentrar en activos de riesgo.' },
+];
+
+// Simulated indicator data (Part 3 will connect real APIs)
+const INDICATORS = [
+  {
+    id: 'yield_curve',
+    nameEs: 'Curva de Tipos 2Y-10Y',
+    nameEn: 'Yield Curve 2Y-10Y',
+    value: '+0.6%',
+    rawValue: 0.6,
+    threshold: '< 0% (invertida) o desinversión tras inversión',
+    trend: '▲ Normalizando',
+    trendDir: 'up',
+    status: 'amber',     // green | yellow | amber | red
+    score: 1,            // 1 = alert active
+    note: 'Desinversión post-2022-24. Señal crítica histórica.',
+    source: 'FRED: T10Y2Y'
+  },
+  {
+    id: 'hy_spread',
+    nameEs: 'Spread High Yield',
+    nameEn: 'HY Credit Spread',
+    value: '5.2%',
+    rawValue: 5.2,
+    threshold: '> 5.5% (zona peligro)',
+    trend: '▲ Ampliándose',
+    trendDir: 'up',
+    status: 'amber',
+    score: 1,
+    note: 'Desde mínimos de 3.2% en 2024. Acercándose al umbral.',
+    source: 'FRED: BAMLH0A0HYM2'
+  },
+  {
+    id: 'market_breadth',
+    nameEs: 'Amplitud de Mercado',
+    nameEn: 'Market Breadth',
+    value: '54%',
+    rawValue: 54,
+    threshold: '< 55% con índice en máximos',
+    trend: '▼ Deteriorando',
+    trendDir: 'down',
+    status: 'amber',
+    score: 1,
+    note: 'Solo el 54% del SP500 sobre su MM200. Divergencia activa.',
+    source: 'SPXA200R'
+  },
+  {
+    id: 'lei',
+    nameEs: 'LEI Conference Board',
+    nameEn: 'Leading Economic Index',
+    value: '101.2',
+    rawValue: 101.2,
+    threshold: 'Caída 3+ meses consecutivos',
+    trend: '▼ Cayendo (5m)',
+    trendDir: 'down',
+    status: 'amber',
+    score: 1,
+    note: 'En caída desde mediados 2024. Proxy: XLY/SPX ratio.',
+    source: 'Conference Board / FRED'
+  },
+  {
+    id: 'cre',
+    nameEs: 'Inmobiliario Comercial',
+    nameEn: 'Commercial Real Estate',
+    value: '7.8%',
+    rawValue: 7.8,
+    threshold: 'Morosidad > 5% o CRE spread > 250bps',
+    trend: '▲ Empeorando',
+    trendDir: 'up',
+    status: 'red',
+    score: 1,
+    note: 'Tasa morosidad CMBS en máximos desde 2013. Bomba activa.',
+    source: 'Trepp / Fed H.8'
+  },
+  {
+    id: 'sector_rotation',
+    nameEs: 'Rotación Sectorial',
+    nameEn: 'Sector Rotation',
+    value: 'XLU/XLY +4%',
+    rawValue: 4,
+    threshold: 'Utilities > Discretionary 3+ semanas',
+    trend: '▲ Iniciando',
+    trendDir: 'up',
+    status: 'yellow',
+    score: 0,
+    note: 'Rotación hacia defensivos iniciada pero no confirmada aún.',
+    source: 'ETF ratio XLU/XLY'
+  },
+  {
+    id: 'vix_skew',
+    nameEs: 'VIX / Ratio Put-Call',
+    nameEn: 'VIX / Put-Call Ratio',
+    value: 'VIX 18.4',
+    rawValue: 18.4,
+    threshold: 'SKEW > 140 o P/C > 1.2 sostenido',
+    trend: '→ Estable / complacente',
+    trendDir: 'flat',
+    status: 'green',
+    score: 0,
+    note: 'Mercado complacente. Sin compra masiva de protección aún.',
+    source: 'CBOE: VIX, PCCE'
+  },
+];
+
+// ── COMPUTED STATE ──────────────────────────────────────────────────────────
+function computeSystemScore() {
+  return INDICATORS.reduce((s, ind) => s + ind.score, 0);
+}
+
+function getPhase(score) {
+  return PHASES.find(p => score >= p.score[0] && score <= p.score[1]) || PHASES[0];
+}
+
+// ── GAUGE ───────────────────────────────────────────────────────────────────
+function updateGauge(score) {
+  const maxScore = 7;
+  const fraction = score / maxScore;
+  // Map 0-1 to -90deg to +90deg (half circle)
+  const angleDeg = -90 + fraction * 180;
+  document.getElementById('needle').style.transform = `rotate(${angleDeg}deg)`;
+  // pivot updated to (110,118) via inline style on SVG element
+  document.getElementById('gaugeScore').textContent = score;
+}
+
+// ── PHASE TIMELINE ──────────────────────────────────────────────────────────
+function buildPhaseTimeline(currentPhase) {
+  const tl = document.getElementById('phaseTimeline');
+  tl.innerHTML = PHASES.map(p => {
+    const isActive = p.id === currentPhase.id;
+    const isPast   = p.id < currentPhase.id;
+    return `
+      <div class="phase-step ${isActive ? 'active' : ''}"
+           style="
+             background: ${isActive ? `rgba(${hexToRgb(p.color)},0.15)` : isPast ? 'rgba(91,168,245,0.04)' : 'transparent'};
+             color: ${isActive ? p.color : isPast ? 'var(--grey-mid)' : 'var(--grey)'};
+             ${isActive ? `box-shadow: inset 0 -2px 0 ${p.color};` : ''}
+           ">
+        <span class="ps-num">${p.id}</span>
+        <span class="ps-name">${p.name}</span>
+      </div>`;
+  }).join('');
+}
+
+function hexToRgb(cssVar) {
+  // Returns a fallback for CSS vars — used for transparency effects
+  const map = {
+    'var(--phase-0)': '34,197,94',
+    'var(--phase-1)': '132,204,22',
+    'var(--phase-2)': '245,158,11',
+    'var(--phase-3)': '239,159,39',
+    'var(--phase-4)': '226,75,74',
+  };
+  return map[cssVar] || '91,168,245';
+}
+
+// ── SIGNAL DOTS ─────────────────────────────────────────────────────────────
+function buildSignalDots(indicators) {
+  const container = document.getElementById('signalDots');
+  container.innerHTML = indicators.map(ind => {
+    const col = ind.score === 1
+      ? (ind.status === 'red' ? 'var(--red-lite)' : 'var(--amber-lite)')
+      : 'rgba(91,168,245,0.2)';
+    return `<div class="signal-dot" style="background:${col}" title="${ind.nameEs}"></div>`;
+  }).join('');
+}
+
+// ── STATUS PILL ─────────────────────────────────────────────────────────────
+function statusPill(status, es, en) {
+  const map = {
+    green:  { cls:'pill-green',  label:'Normal',    labelEn:'Normal'  },
+    yellow: { cls:'pill-yellow', label:'Precaución', labelEn:'Caution' },
+    amber:  { cls:'pill-amber',  label:'Alerta',     labelEn:'Alert'   },
+    red:    { cls:'pill-red',    label:'Crítico',    labelEn:'Critical'},
+  };
+  const s = map[status] || map['green'];
+  return `<div class="status-pill ${s.cls}">
+    <span class="dot"></span>${s.label} · ${s.labelEn}
+  </div>`;
+}
+
+// ── INDICATOR ROW ────────────────────────────────────────────────────────────
+function buildIndicatorRow(ind, delay) {
+  const trendColor = ind.trendDir === 'up'
+    ? (ind.score ? 'var(--red-lite)' : 'var(--green-lite)')
+    : ind.trendDir === 'down'
+      ? (ind.score ? 'var(--red-lite)' : 'var(--green-lite)')
+      : 'var(--grey-mid)';
+
+  const dotCls = ind.score
+    ? (ind.status === 'red' ? 'dot-active' : 'dot-amber')
+    : 'dot-inactive';
+
+  return `
+    <div class="ind-row status-${ind.status}" style="animation-delay:${delay}ms">
+      <div class="ind-name">
+        <span class="ind-name-es">${ind.nameEs}</span>
+        <span class="ind-name-en">${ind.nameEn} · ${ind.source}</span>
+      </div>
+      <div class="ind-value" style="color:${ind.status==='red'?'var(--red-lite)':ind.status==='amber'?'var(--amber-lite)':ind.status==='yellow'?'var(--phase-1)':'var(--green-lite)'}">${ind.value}</div>
+      <div class="ind-threshold">${ind.threshold}</div>
+      <div class="ind-trend" style="color:${trendColor}">${ind.trend}</div>
+      <div class="ind-status">${statusPill(ind.status)}<span style="font-family:var(--font-mono);font-size:8px;color:var(--grey-mid);margin-top:2px">${ind.note}</span></div>
+      <div><div class="ind-score-dot ${dotCls}">${ind.score}</div></div>
+    </div>`;
+}
+
+// ── PHASE BADGE ──────────────────────────────────────────────────────────────
+function updatePhaseBadge(phase) {
+  const badge = document.getElementById('phaseBadge');
+  badge.style.background = `rgba(${hexToRgb(phase.color)},0.08)`;
+  badge.style.borderColor = `rgba(${hexToRgb(phase.color)},0.3)`;
+  badge.style.color = phase.color;
+  document.getElementById('phaseNum').textContent = `FASE ${phase.id} · PHASE ${phase.id}`;
+  document.getElementById('phaseName').textContent = `${phase.name.toUpperCase()} · ${phase.nameEn.toUpperCase()}`;
+  document.getElementById('phaseDesc').textContent = phase.desc;
+  document.getElementById('gaugeScore').style.color = phase.color;
+  document.getElementById('phaseNameInline').textContent = phase.name;
+  document.getElementById('actionText').textContent = phase.action;
+}
+
+// ── MAIN RENDER ───────────────────────────────────────────────────────────────
+function render() {
+  const score = computeSystemScore();
+  const phase = getPhase(score);
+
+  updateGauge(score);
+  updatePhaseBadge(phase);
+  buildPhaseTimeline(phase);
+  buildSignalDots(INDICATORS);
+
+  // Indicators
+  const container = document.getElementById('indicatorsContainer');
+  container.innerHTML = INDICATORS
+    .map((ind, i) => buildIndicatorRow(ind, i * 80))
+    .join('');
+
+  // Stats
+  document.getElementById('statAlerts').textContent = INDICATORS.filter(i=>i.score).length;
+  document.getElementById('statScore').textContent  = `${score}/7`;
+
+  // Timestamp
+  const now = new Date();
+  const ts  = now.toLocaleDateString('es-ES') + ' · ' + now.toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'});
+  document.querySelector('#updateTime span').textContent = ts;
+  // Build charts (only once)
+  if (!window._chartsBuilt) {
+    buildAggregateChart();
+    buildMiniChartsGrid();
+    window._chartsBuilt = true;
+  }
+
+  document.getElementById('footerDate').textContent = now.toLocaleDateString('es-ES', {month:'long', year:'numeric'});
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PART 3 — REAL API ENGINE
+// ═══════════════════════════════════════════════════════════════════════════
+
+const API = {
+  FRED : 'e69a9af003236d23e5262222fea32062',
+  FMP  : 'rA7oMzR7DzLMpTG8mUbqLxyoGuPcJCcd',
+};
+
+// ── Status banner ─────────────────────────────────────────────────────────
+const STATUS = { ok:0, warn:0, err:0 };
+
+function showApiStatus(msg, type='info') {
+  let bar = document.getElementById('apiStatusBar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'apiStatusBar';
+    bar.style.cssText = `
+      position:fixed;bottom:0;left:0;right:0;z-index:999;
+      font-family:'Space Mono',monospace;font-size:10px;
+      padding:6px 16px;letter-spacing:.06em;
+      display:flex;justify-content:space-between;align-items:center;
+      transition:background .3s;
+    `;
+    document.body.appendChild(bar);
+  }
+  const cols = { info:'rgba(13,45,94,0.95)', warn:'rgba(133,79,11,0.95)', err:'rgba(90,20,20,0.95)', ok:'rgba(10,74,58,0.95)' };
+  bar.style.background = cols[type] || cols.info;
+  bar.innerHTML = `<span>${msg}</span><span style="opacity:.5">${new Date().toLocaleTimeString('es-ES')}</span>`;
+}
+
+// ── MULTI-PROXY FETCH ENGINE ──────────────────────────────────────────────
+// Tries multiple proxies in order until one works
+// Each proxy has its own URL-encoding requirement
+const PROXIES = [
+  // corsproxy.io: needs raw URL (no extra encoding)
+  url => ({ proxyUrl: `https://corsproxy.io/?${url}`, decode: false }),
+  // codetabs: needs encoded URL
+  url => ({ proxyUrl: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`, decode: false }),
+  // thingproxy: appended raw
+  url => ({ proxyUrl: `https://thingproxy.freeboard.io/fetch/${url}`, decode: false }),
+];
+
+async function proxyFetch(targetUrl) {
+  let lastErr;
+  for (const makeProxy of PROXIES) {
+    try {
+      const { proxyUrl } = makeProxy(targetUrl);
+      const ctrl  = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 9000);
+      const r     = await fetch(proxyUrl, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const text = await r.text();
+      // Strip any XSSI prefix
+      const clean = text.replace(/^[^[{]*/, '');
+      return JSON.parse(clean);
+    } catch(e) {
+      lastErr = e;
+      continue;
+    }
+  }
+  throw new Error(`All proxies failed: ${lastErr?.message}`);
+}
+
+// ── FRED via multi-proxy ───────────────────────────────────────────────────
+async function fredFetch(seriesId, limit=1) {
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${API.FRED}&file_type=json&sort_order=desc&limit=${limit}`;
+  const d = await proxyFetch(url);
+  return (d.observations || []).filter(o => o.value !== '.');
+}
+
+async function fredHistory(seriesId, years=16) {
+  const start = (new Date().getFullYear() - years) + '-01-01';
+  const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${API.FRED}&file_type=json&sort_order=asc&observation_start=${start}&frequency=m`;
+  const d = await proxyFetch(url);
+  return (d.observations || []).filter(o => o.value !== '.');
+}
+
+// ── Yahoo Finance via multi-proxy ──────────────────────────────────────────
+async function yahooQuote(symbol) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  const d = await proxyFetch(url);
+  const meta   = d?.chart?.result?.[0]?.meta;
+  const quotes = d?.chart?.result?.[0]?.indicators?.quote?.[0];
+  if (!meta) throw new Error(`Yahoo: no data for ${symbol}`);
+  const closes = (quotes?.close || []).filter(Boolean);
+  const last   = closes.slice(-1)[0] || meta.regularMarketPrice;
+  const prev   = closes.slice(-2)[0] || last;
+  return {
+    symbol,
+    price:         last,
+    previousClose: prev,
+    priceAvg200:   meta.twoHundredDayAverage || last,
+    priceAvg50:    meta.fiftyDayAverage      || last,
+    change:        last - prev,
+    changePct:     ((last - prev) / prev) * 100,
+  };
+}
+
+async function yahooHistory(symbol, years=16) {
+  const now   = Math.floor(Date.now() / 1000);
+  const start = now - years * 365 * 24 * 3600;
+  const url   = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&period1=${start}&period2=${now}`;
+  const d     = await proxyFetch(url);
+  const timestamps = d?.chart?.result?.[0]?.timestamp || [];
+  const closes     = d?.chart?.result?.[0]?.indicators?.quote?.[0]?.close || [];
+  return timestamps.map((ts, i) => ({
+    date:  new Date(ts * 1000).toISOString().slice(0,10),
+    close: closes[i],
+  })).filter(r => r.close != null);
+}
+
+// ── Helper: annual downsample ─────────────────────────────────────────────
+function toAnnual(rows, valueKey='close') {
+  const byYear = {};
+  rows.forEach(row => {
+    const yr = (row.date || '').slice(0,4);
+    const v  = parseFloat(row[valueKey] ?? row.value ?? 0);
+    if (yr && !isNaN(v)) byYear[yr] = v; // last value per year wins
+  });
+  return byYear;
+}
+
+// ── Evaluate indicator status ──────────────────────────────────────────────
+function evalStatus(value, threshold, invertAlert, meta={}) {
+  // invertAlert=true means alert when value < threshold
+  const inAlert = invertAlert ? value < threshold : value > threshold;
+  const distance = Math.abs(value - threshold);
+  const relDist   = threshold !== 0 ? distance / Math.abs(threshold) : distance;
+
+  if (!inAlert) {
+    // How close to threshold?
+    if (relDist < 0.08) return { status:'yellow', score:0 };
+    return { status:'green', score:0 };
+  }
+  // In alert zone
+  if (relDist > 0.25) return { status:'red',   score:1 };
+  return { status:'amber', score:1 };
+}
+
+function trendArrow(current, previous, invertAlert) {
+  if (previous == null) return { text:'→ Sin datos previos', dir:'flat' };
+  const rising = current > previous;
+  const danger = invertAlert ? !rising : rising;  // worsening direction
+  const arrow  = rising ? '▲' : current < previous ? '▼' : '→';
+  return { text:`${arrow} ${rising ? 'Subiendo' : current < previous ? 'Bajando' : 'Estable'}`, dir: rising?'up':'down' };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN DATA LOADER
+// ─────────────────────────────────────────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  showApiStatus('Conectando con APIs… · Connecting to data sources…', 'info');
+
+  const errors = [];
+
+  // ── 1. YIELD CURVE 2Y-10Y (FRED: T10Y2Y) ──────────────────────────────────
+  try {
+    showApiStatus('FRED: Curva de tipos 2Y-10Y…', 'info');
+    const obs  = await fredFetch('T10Y2Y', 5);
+    const obs2 = await fredFetch('T10Y2Y', 2);
+    const cur  = parseFloat(obs[0].value);
+    const prev = parseFloat(obs2[1]?.value ?? obs[0].value);
+    const { status, score } = evalStatus(cur, 0, true);
+    // Special case: post-inversion normalization is extra dangerous
+    const wasInverted = prev < 0 && cur >= 0;
+    const adjStatus   = wasInverted ? 'amber' : status;
+    const trend       = trendArrow(cur, prev, true);
+
+    INDICATORS[0].rawValue = cur;
+    INDICATORS[0].value    = (cur >= 0 ? '+' : '') + cur.toFixed(2) + '%';
+    INDICATORS[0].status   = adjStatus;
+    INDICATORS[0].score    = score;
+    INDICATORS[0].trend    = trend.text + (wasInverted ? ' (desinversión crítica)' : '');
+    INDICATORS[0].trendDir = trend.dir;
+    INDICATORS[0].note     = wasInverted
+      ? 'Desinversión post-inversión: señal histórica de recesión 3-12m.'
+      : cur < 0
+        ? 'Curva invertida activa. Alto riesgo de recesión futura.'
+        : 'Curva normal. Vigilar si vuelve a invertirse.';
+
+    // History for mini chart
+    const hist = await fredHistory('T10Y2Y', 16);
+    const byYr = toAnnual(hist, 'value');
+    HIST_YIELD.splice(0, HIST_YIELD.length,
+      ...HIST_LABELS.map(y => byYr[y] ?? HIST_YIELD[HIST_LABELS.indexOf(y)] ?? null));
+  } catch(e) { errors.push('Yield curve: ' + e.message); }
+
+  // ── 2. HY SPREAD (FRED: BAMLH0A0HYM2) ─────────────────────────────────────
+  try {
+    showApiStatus('FRED: Spread High Yield…', 'info');
+    const obs  = await fredFetch('BAMLH0A0HYM2', 5);
+    const obs2 = await fredFetch('BAMLH0A0HYM2', 2);
+    const cur  = parseFloat(obs[0].value);
+    const prev = parseFloat(obs2[1]?.value ?? obs[0].value);
+    const { status, score } = evalStatus(cur, 5.5, false);
+    const trend = trendArrow(cur, prev, false);
+
+    INDICATORS[1].rawValue = cur;
+    INDICATORS[1].value    = cur.toFixed(2) + '%';
+    INDICATORS[1].status   = status;
+    INDICATORS[1].score    = score;
+    INDICATORS[1].trend    = trend.text;
+    INDICATORS[1].trendDir = trend.dir;
+    INDICATORS[1].note     = cur > 7
+      ? 'Spreads en zona de peligro severo. Crisis crediticia en curso.'
+      : cur > 5.5
+        ? 'Spreads sobre umbral. Deterioro crediticio activo.'
+        : 'Spreads bajo control. Mercado de crédito sano.';
+
+    const hist  = await fredHistory('BAMLH0A0HYM2', 16);
+    const byYr  = toAnnual(hist, 'value');
+    HIST_HY.splice(0, HIST_HY.length,
+      ...HIST_LABELS.map(y => byYr[y] ?? HIST_HY[HIST_LABELS.indexOf(y)] ?? null));
+  } catch(e) { errors.push('HY Spread: ' + e.message); }
+
+  // ── 3. MARKET BREADTH via FMP (% SP500 > 200d MA) ─────────────────────────
+  // We calculate this from SP500 constituent performance as a proxy
+  try {
+    showApiStatus('FMP: Amplitud de mercado (SP500 vs MM200)…', 'info');
+    // Use SP500 ETF (SPY) vs its 200d MA as a single proxy
+    const spy = await yahooQuote('SPY');
+    if (spy) {
+      const cur  = spy.price;
+      const ma200 = spy.priceAvg200;
+      // Rough breadth proxy: distance above/below MA200
+      const breadthProxy = ma200 > 0 ? Math.min(100, Math.max(0, 50 + (cur - ma200) / ma200 * 200)) : 54;
+      const roundedBreadth = Math.round(breadthProxy);
+      const { status, score } = evalStatus(roundedBreadth, 55, true);
+      const trend = trendArrow(roundedBreadth, INDICATORS[2].rawValue, true);
+
+      INDICATORS[2].rawValue = roundedBreadth;
+      INDICATORS[2].value    = roundedBreadth + '%';
+      INDICATORS[2].status   = status;
+      INDICATORS[2].score    = score;
+      INDICATORS[2].trend    = trend.text;
+      INDICATORS[2].trendDir = trend.dir;
+      INDICATORS[2].note     = roundedBreadth < 45
+        ? 'Amplitud muy deteriorada. Base del mercado muy estrecha.'
+        : roundedBreadth < 55
+          ? 'Amplitud bajo umbral mientras índice en máximos. Divergencia activa.'
+          : 'Amplitud saludable. Mercado con participación amplia.';
+
+      // Update SP500 level display
+      const spyClose = spy.price * 10; // approximate SP500 from SPY
+      document.getElementById('statYield').closest('.stat-card')
+        .querySelector('.stat-value').parentElement
+        .querySelector('.stat-change').textContent = '';
+    }
+  } catch(e) { errors.push('Breadth: ' + e.message); }
+
+  // ── 4. LEI proxy via FRED (USALOLITONOSTSAM — monthly, slight lag) ─────────
+  try {
+    showApiStatus('FRED: LEI / Indicador adelantado…', 'info');
+    const obs = await fredFetch('USALOLITONOSTSAM', 4);
+    const cur  = parseFloat(obs[0].value);
+    const prev3= parseFloat(obs[3]?.value ?? obs[0].value);
+    const falling3m = cur < prev3;
+    const { status, score } = evalStatus(cur, 100.5, true);
+    const adjScore  = (falling3m && cur < 101) ? 1 : score;
+    const adjStatus = adjScore ? (cur < 99 ? 'red' : 'amber') : status;
+
+    INDICATORS[3].rawValue = cur;
+    INDICATORS[3].value    = cur.toFixed(1);
+    INDICATORS[3].status   = adjStatus;
+    INDICATORS[3].score    = adjScore;
+    INDICATORS[3].trend    = falling3m ? '▼ Cayendo 3+ meses' : '→ Estable / recuperando';
+    INDICATORS[3].trendDir = falling3m ? 'down' : 'flat';
+    INDICATORS[3].note     = falling3m
+      ? `LEI cayendo ${(prev3 - cur).toFixed(1)} pts en 3 meses. Señal de desaceleración.`
+      : 'LEI estable. Sin señal de contracción económica inminente.';
+
+    const hist = await fredHistory('USALOLITONOSTSAM', 16);
+    const byYr = toAnnual(hist, 'value');
+    HIST_LEI.splice(0, HIST_LEI.length,
+      ...HIST_LABELS.map(y => byYr[y] ?? HIST_LEI[HIST_LABELS.indexOf(y)] ?? null));
+  } catch(e) { errors.push('LEI: ' + e.message); }
+
+  // ── 5. CRE proxy via FRED (DRCRELEXBS — delinquency rate CRE loans) ────────
+  try {
+    showApiStatus('FRED: Inmobiliario comercial…', 'info');
+    const obs  = await fredFetch('DRCRELEXBS', 2);
+    const cur  = parseFloat(obs[0].value);
+    const prev = parseFloat(obs[1]?.value ?? obs[0].value);
+    const { status, score } = evalStatus(cur, 5.0, false);
+    const trend = trendArrow(cur, prev, false);
+
+    INDICATORS[4].rawValue = cur;
+    INDICATORS[4].value    = cur.toFixed(1) + '%';
+    INDICATORS[4].status   = status;
+    INDICATORS[4].score    = score;
+    INDICATORS[4].trend    = trend.text;
+    INDICATORS[4].trendDir = trend.dir;
+    INDICATORS[4].note     = cur > 7
+      ? 'Morosidad CRE en máximos post-2013. Riesgo bancario regional elevado.'
+      : cur > 5
+        ? 'Tasa de morosidad sobre umbral. Presión en bancos regionales.'
+        : 'Morosidad CRE bajo control.';
+
+    const hist = await fredHistory('DRCRELEXBS', 16);
+    const byYr = toAnnual(hist, 'value');
+    HIST_CRE.splice(0, HIST_CRE.length,
+      ...HIST_LABELS.map(y => byYr[y] ?? HIST_CRE[HIST_LABELS.indexOf(y)] ?? null));
+  } catch(e) { errors.push('CRE: ' + e.message); }
+
+  // ── 6. SECTOR ROTATION: XLU/XLY ratio via FMP ─────────────────────────────
+  try {
+    showApiStatus('FMP: Rotación sectorial XLU/XLY…', 'info');
+    const [xlu, xly] = await Promise.all([yahooQuote('XLU'), yahooQuote('XLY')]);
+    if (xlu && xly) {
+      const ratio    = xlu.price / xly.price;
+      const prevRatio= (INDICATORS[5].rawValue || ratio);
+      const pctChg   = ((ratio - prevRatio) / prevRatio * 100);
+      // Alert: ratio rising >3% over recent period
+      const alerting = ratio > (xlu.priceAvg50 / xly.price) * 1.03;
+      const status   = alerting ? 'amber' : pctChg > 1.5 ? 'yellow' : 'green';
+      const score    = alerting ? 1 : 0;
+
+      INDICATORS[5].rawValue = ratio;
+      INDICATORS[5].value    = 'XLU/XLY ' + ratio.toFixed(3);
+      INDICATORS[5].status   = status;
+      INDICATORS[5].score    = score;
+      INDICATORS[5].trend    = ratio > prevRatio ? '▲ Defensivos liderando' : '▼ Cíclicos liderando';
+      INDICATORS[5].trendDir = ratio > prevRatio ? 'up' : 'down';
+      INDICATORS[5].note     = alerting
+        ? 'Utilities liderando claramente. Rotación defensiva confirmada.'
+        : 'Sin rotación defensiva significativa aún.';
+    }
+  } catch(e) { errors.push('Sector rotation: ' + e.message); }
+
+  // ── 7. VIX via FMP ────────────────────────────────────────────────────────
+  try {
+    showApiStatus('FMP: VIX…', 'info');
+    const vix = await yahooQuote('^VIX');
+    if (vix) {
+      const cur  = vix.price;
+      const prev = vix.previousClose;
+      const { status, score } = evalStatus(cur, 20, false);
+      const trend = trendArrow(cur, prev, false);
+
+      INDICATORS[6].rawValue = cur;
+      INDICATORS[6].value    = 'VIX ' + cur.toFixed(1);
+      INDICATORS[6].status   = status;
+      INDICATORS[6].score    = score;
+      INDICATORS[6].trend    = trend.text;
+      INDICATORS[6].trendDir = trend.dir;
+      INDICATORS[6].note     = cur > 25
+        ? 'VIX elevado. Mercado en modo miedo. Compra de protección activa.'
+        : cur > 20
+          ? 'VIX sobre umbral. Volatilidad al alza.'
+          : 'Mercado complacente. Sin compra masiva de protección.';
+
+      HIST_VIX[HIST_VIX.length-1] = cur;
+    }
+  } catch(e) { errors.push('VIX: ' + e.message); }
+
+  // ── UPDATE SP500 DISPLAY via FMP ──────────────────────────────────────────
+  try {
+    const spy = await yahooQuote('SPY');
+    if (spy) {
+      const spxApprox = (spy.price * 10).toFixed(0);
+      const spxEl = document.querySelector('.phase-info [style*="blue-lite"]');
+      if (spxEl) spxEl.textContent = Number(spxApprox).toLocaleString('es-ES');
+    }
+  } catch(e) { /* non-critical */ }
+
+  // ── UPDATE STAT CARDS with live values ────────────────────────────────────
+  try {
+    const yieldInd = INDICATORS[0];
+    const hyInd    = INDICATORS[1];
+    document.getElementById('statYield').textContent =
+      (yieldInd.rawValue >= 0 ? '+' : '') + yieldInd.rawValue.toFixed(2) + '%';
+    document.getElementById('statYield').style.color =
+      yieldInd.status === 'red' ? 'var(--red-lite)' :
+      yieldInd.status === 'amber' ? 'var(--amber-lite)' : 'var(--green-lite)';
+
+    document.getElementById('statHY').textContent = hyInd.rawValue.toFixed(2) + '%';
+    document.getElementById('statHY').style.color =
+      hyInd.status === 'red' ? 'var(--red-lite)' :
+      hyInd.status === 'amber' ? 'var(--amber-lite)' : 'var(--green-lite)';
+  } catch(e) { /* non-critical */ }
+
+  // ── REBUILD CHARTS with live data ─────────────────────────────────────────
+  if (window._chartsBuilt) {
+    // Destroy and rebuild
+    Chart.getChart('aggregateChart')?.destroy();
+    document.querySelectorAll('[id^="miniChart_"]').forEach(c => Chart.getChart(c)?.destroy());
+    window._chartsBuilt = false;
+  }
+
+  // ── UPDATE MINI CHART DEFS with live current values ────────────────────────
+  MINI_CHART_DEFS[0].currentVal   = INDICATORS[0].value;
+  MINI_CHART_DEFS[0].currentColor = INDICATORS[0].status === 'amber' ? 'var(--amber-lite)' : INDICATORS[0].status === 'red' ? 'var(--red-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[1].currentVal   = INDICATORS[1].value;
+  MINI_CHART_DEFS[1].currentColor = INDICATORS[1].status === 'amber' ? 'var(--amber-lite)' : INDICATORS[1].status === 'red' ? 'var(--red-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[2].currentVal   = INDICATORS[2].value;
+  MINI_CHART_DEFS[2].currentColor = INDICATORS[2].status === 'amber' ? 'var(--amber-lite)' : INDICATORS[2].status === 'red' ? 'var(--red-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[3].currentVal   = INDICATORS[3].value;
+  MINI_CHART_DEFS[3].currentColor = INDICATORS[3].status === 'amber' ? 'var(--amber-lite)' : INDICATORS[3].status === 'red' ? 'var(--red-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[4].currentVal   = INDICATORS[4].value;
+  MINI_CHART_DEFS[4].currentColor = INDICATORS[4].status === 'red' ? 'var(--red-lite)' : INDICATORS[4].status === 'amber' ? 'var(--amber-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[5].currentVal   = INDICATORS[5].value;
+  MINI_CHART_DEFS[5].currentColor = INDICATORS[5].status === 'amber' ? 'var(--amber-lite)' : 'var(--green-lite)';
+  MINI_CHART_DEFS[6].currentVal   = INDICATORS[6].value;
+  MINI_CHART_DEFS[6].currentColor = INDICATORS[6].status === 'red' ? 'var(--red-lite)' : INDICATORS[6].status === 'amber' ? 'var(--amber-lite)' : 'var(--green-lite)';
+
+  // ── FINAL RENDER ──────────────────────────────────────────────────────────
+  render();
+
+  // Status summary
+  const alertCount = INDICATORS.filter(i => i.score).length;
+  if (errors.length > 0) {
+    showApiStatus(`${alertCount}/7 señales activas · ${errors.length} fuentes con error: ${errors[0]}`, 'warn');
+  } else {
+    showApiStatus(`✓ Datos actualizados · ${alertCount}/7 señales activas · Todas las fuentes OK`, 'ok');
+  }
+
+  btn.classList.remove('spinning');
+}
+
+
+// ── HISTORICAL DATA (monthly, 2010-2026) ───────────────────────────────────
+const HIST_LABELS = [
+  '2010','2011','2012','2013','2014','2015','2016','2017','2018','2019',
+  '2020','2021','2022','2023','2024','2025','2026'
+];
+
+// SP500 annual close approx (normalised to 100 = Jan 2010)
+const HIST_SP500 = [100, 98, 113, 146, 163, 162, 177, 215, 194, 248, 274, 398, 344, 408, 433, 484, 568];
+
+// System score estimated per year
+const HIST_SCORE = [1, 2, 1, 1, 2, 3, 2, 1, 3, 2, 4, 2, 5, 3, 3, 4, 4];
+
+// Yield curve 2Y-10Y spread
+const HIST_YIELD = [2.8, 2.0, 1.5, 2.5, 1.8, 1.2, 1.5, 0.8, -0.3, -0.5, 1.2, -0.8, -1.2, 0.3, 0.5, 0.8, 0.6];
+const YIELD_THRESHOLD = 0;
+
+// HY Spread %
+const HIST_HY = [5.0, 4.5, 4.2, 3.8, 3.5, 5.5, 4.2, 3.5, 3.8, 8.5, 3.5, 4.8, 5.5, 3.8, 3.2, 4.5, 5.2];
+const HY_THRESHOLD = 5.5;
+
+// Market breadth % above MM200
+const HIST_BREADTH = [68, 55, 72, 78, 65, 52, 60, 74, 48, 65, 55, 72, 38, 58, 62, 55, 54];
+const BREADTH_THRESHOLD = 55;
+
+// LEI index (100 = neutral)
+const HIST_LEI = [105, 108, 112, 114, 113, 115, 116, 118, 110, 108, 105, 108, 100, 104, 106, 104, 101];
+const LEI_THRESHOLD = 103;
+
+// CRE morosidad %
+const HIST_CRE = [4.2, 3.8, 3.5, 3.0, 2.8, 2.6, 2.5, 2.3, 2.5, 2.8, 3.5, 3.2, 4.8, 6.2, 7.0, 7.5, 7.8];
+const CRE_THRESHOLD = 5.0;
+
+// Sector rotation: XLU/XLY ratio (100 = neutral Jan 2010)
+const HIST_ROTATION = [100, 108, 98, 88, 92, 110, 104, 88, 112, 96, 105, 88, 118, 100, 96, 102, 106];
+const ROTATION_THRESHOLD = 108;
+
+// VIX level
+const HIST_VIX = [17.8, 24.2, 14.6, 12.4, 14.2, 15.6, 14.8, 11.2, 16.6, 13.8, 29.4, 17.2, 22.4, 13.8, 12.6, 19.2, 18.4];
+const VIX_THRESHOLD = 20;
+
+// Crash zones (indices into HIST_LABELS where correction happened)
+const CRASH_ZONES = [
+  { start: 1, end: 1, label: 'Deuda EU' },
+  { start: 5, end: 6, label: 'China/Oil' },
+  { start: 8, end: 8, label: 'Fed 2018' },
+  { start: 10, end: 10, label: 'COVID' },
+  { start: 11, end: 12, label: 'Bear 2022' },
+];
+
+// Chart.js global crash zone plugin
+const crashZonePlugin = {
+  id: 'crashZones',
+  beforeDraw(chart, args, opts) {
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !opts.zones) return;
+    const xScale = scales.x;
+    ctx.save();
+    opts.zones.forEach(z => {
+      const x0 = xScale.getPixelForValue(z.start) - (xScale.getPixelForValue(1) - xScale.getPixelForValue(0)) / 2;
+      const x1 = xScale.getPixelForValue(z.end)   + (xScale.getPixelForValue(1) - xScale.getPixelForValue(0)) / 2;
+      ctx.fillStyle = 'rgba(226,75,74,0.10)';
+      ctx.fillRect(x0, chartArea.top, x1 - x0, chartArea.height);
+    });
+    ctx.restore();
+  }
+};
+Chart.register(crashZonePlugin);
+
+// ── CHART DEFAULTS ─────────────────────────────────────────────────────────
+Chart.defaults.color = '#8BA3C7';
+Chart.defaults.font.family = "'Space Mono', monospace";
+Chart.defaults.font.size = 9;
+
+const GRID_COLOR = 'rgba(91,168,245,0.06)';
+const TICK_COLOR = '#8BA3C7';
+
+function baseScaleOpts(display = true) {
+  return {
+    grid: { color: GRID_COLOR, drawBorder: false },
+    ticks: { color: TICK_COLOR, maxRotation: 0, font: { size: 8 }, display },
+    border: { display: false },
+  };
+}
+
+// ── AGGREGATE CHART ────────────────────────────────────────────────────────
+function buildAggregateChart() {
+  const ctx = document.getElementById('aggregateChart').getContext('2d');
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: HIST_LABELS,
+      datasets: [
+        {
+          type: 'line',
+          label: 'S&P 500 (norm.)',
+          data: HIST_SP500,
+          borderColor: 'rgba(91,168,245,0.7)',
+          backgroundColor: 'rgba(91,168,245,0.04)',
+          borderWidth: 1.8,
+          pointRadius: 0,
+          tension: 0.35,
+          fill: true,
+          yAxisID: 'ySP',
+          order: 1,
+        },
+        {
+          type: 'bar',
+          label: 'Score sistema (0-7)',
+          data: HIST_SCORE,
+          backgroundColor: HIST_SCORE.map(s =>
+            s >= 6 ? 'rgba(226,75,74,0.75)' :
+            s >= 4 ? 'rgba(245,158,11,0.70)' :
+            s >= 2 ? 'rgba(132,204,22,0.55)' :
+                     'rgba(34,197,94,0.50)'
+          ),
+          borderColor: HIST_SCORE.map(s =>
+            s >= 6 ? 'rgba(226,75,74,0.9)' :
+            s >= 4 ? 'rgba(245,158,11,0.9)' :
+            s >= 2 ? 'rgba(132,204,22,0.7)' :
+                     'rgba(34,197,94,0.7)'
+          ),
+          borderWidth: 1,
+          borderRadius: 4,
+          yAxisID: 'yScore',
+          order: 2,
+        },
+        // Phase threshold lines
+        {
+          type: 'line',
+          label: 'Umbral alerta (4)',
+          data: Array(HIST_LABELS.length).fill(4),
+          borderColor: 'rgba(245,158,11,0.4)',
+          borderWidth: 1,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false,
+          yAxisID: 'yScore',
+          order: 0,
+        },
+        {
+          type: 'line',
+          label: 'Umbral crisis (6)',
+          data: Array(HIST_LABELS.length).fill(6),
+          borderColor: 'rgba(226,75,74,0.4)',
+          borderWidth: 1,
+          borderDash: [4, 4],
+          pointRadius: 0,
+          fill: false,
+          yAxisID: 'yScore',
+          order: 0,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(8,17,31,0.95)',
+          borderColor: 'rgba(91,168,245,0.2)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: items => items[0].label,
+            label: item => {
+              if (item.datasetIndex === 0) return ` SP500: ${item.raw} (norm.)`;
+              if (item.datasetIndex === 1) return ` Score: ${item.raw}/7`;
+              return null;
+            }
+          }
+        },
+        crashZones: { zones: CRASH_ZONES },
+      },
+      scales: {
+        x: { ...baseScaleOpts(), grid: { display: false } },
+        ySP: {
+          ...baseScaleOpts(false),
+          position: 'right',
+          min: 0, max: 650,
+        },
+        yScore: {
+          ...baseScaleOpts(),
+          position: 'left',
+          min: 0, max: 7,
+          ticks: {
+            ...baseScaleOpts().ticks,
+            stepSize: 1,
+            callback: v => v === 0 ? '' : v,
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── MINI CHARTS ────────────────────────────────────────────────────────────
+const MINI_CHART_DEFS = [
+  {
+    id: 'yield_curve', label: 'Curva Tipos 2Y-10Y', labelEn: 'Yield Curve',
+    data: HIST_YIELD, threshold: YIELD_THRESHOLD,
+    color: '#5BA8F5', unit: '%',
+    thresholdLabel: 'Alerta: < 0%',
+    invertAlert: true,   // alert when BELOW threshold
+    currentVal: '+0.6%', currentColor: 'var(--amber-lite)',
+  },
+  {
+    id: 'hy_spread', label: 'Spread High Yield', labelEn: 'HY Credit Spread',
+    data: HIST_HY, threshold: HY_THRESHOLD,
+    color: '#EF9F27', unit: '%',
+    thresholdLabel: 'Alerta: > 5.5%',
+    invertAlert: false,
+    currentVal: '5.2%', currentColor: 'var(--amber-lite)',
+  },
+  {
+    id: 'market_breadth', label: 'Amplitud Mercado', labelEn: 'Market Breadth',
+    data: HIST_BREADTH, threshold: BREADTH_THRESHOLD,
+    color: '#52A01E', unit: '%',
+    thresholdLabel: 'Alerta: < 55%',
+    invertAlert: true,
+    currentVal: '54%', currentColor: 'var(--amber-lite)',
+  },
+  {
+    id: 'lei', label: 'LEI Conf. Board', labelEn: 'Leading Econ. Index',
+    data: HIST_LEI, threshold: LEI_THRESHOLD,
+    color: '#7B6EDB', unit: '',
+    thresholdLabel: 'Alerta: < 103 y cayendo',
+    invertAlert: true,
+    currentVal: '101.2', currentColor: 'var(--amber-lite)',
+  },
+  {
+    id: 'cre', label: 'Inmob. Comercial', labelEn: 'Commercial Real Estate',
+    data: HIST_CRE, threshold: CRE_THRESHOLD,
+    color: '#0F9B78', unit: '%',
+    thresholdLabel: 'Alerta: > 5%',
+    invertAlert: false,
+    currentVal: '7.8%', currentColor: 'var(--red-lite)',
+  },
+  {
+    id: 'rotation', label: 'Rotación Sectorial', labelEn: 'Sector Rotation XLU/XLY',
+    data: HIST_ROTATION, threshold: ROTATION_THRESHOLD,
+    color: '#D4537E', unit: '',
+    thresholdLabel: 'Alerta: XLU > XLY 3+ sem.',
+    invertAlert: false,
+    currentVal: '+4%', currentColor: 'var(--phase-1)',
+  },
+  {
+    id: 'vix', label: 'VIX / Put-Call', labelEn: 'VIX Level',
+    data: HIST_VIX, threshold: VIX_THRESHOLD,
+    color: '#E24B4A', unit: '',
+    thresholdLabel: 'Alerta: VIX > 20 sostenido',
+    invertAlert: false,
+    currentVal: '18.4', currentColor: 'var(--green-lite)',
+  },
+];
+
+function buildMiniChart(def, canvasId) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+
+  // Colour each data point: red if in alert zone
+  const pointColors = def.data.map((v, i) => {
+    const inAlert = def.invertAlert ? v < def.threshold : v > def.threshold;
+    return inAlert ? 'rgba(226,75,74,0.85)' : def.color;
+  });
+
+  const areaGrad = ctx.createLinearGradient(0, 0, 0, 140);
+  areaGrad.addColorStop(0, def.color.replace(')', ',0.18)').replace('rgb', 'rgba'));
+  areaGrad.addColorStop(1, 'rgba(8,17,31,0)');
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: HIST_LABELS,
+      datasets: [
+        // Threshold line
+        {
+          label: 'Umbral',
+          data: Array(HIST_LABELS.length).fill(def.threshold),
+          borderColor: 'rgba(226,75,74,0.5)',
+          borderWidth: 1.2,
+          borderDash: [5, 4],
+          pointRadius: 0,
+          fill: false,
+          order: 0,
+        },
+        // Main data line
+        {
+          label: def.label,
+          data: def.data,
+          borderColor: def.color,
+          backgroundColor: areaGrad,
+          borderWidth: 1.8,
+          pointRadius: def.data.map((v, i) => {
+            const inAlert = def.invertAlert ? v < def.threshold : v > def.threshold;
+            return inAlert ? 3.5 : 0;
+          }),
+          pointBackgroundColor: pointColors,
+          tension: 0.35,
+          fill: true,
+          order: 1,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(8,17,31,0.95)',
+          borderColor: 'rgba(91,168,245,0.15)',
+          borderWidth: 1,
+          padding: 8,
+          callbacks: {
+            label: item => item.datasetIndex === 1
+              ? ` ${def.label}: ${item.raw}${def.unit}`
+              : null,
+          }
+        },
+        crashZones: { zones: CRASH_ZONES },
+      },
+      scales: {
+        x: {
+          ...baseScaleOpts(),
+          ticks: {
+            color: TICK_COLOR,
+            maxRotation: 0,
+            font: { size: 7.5 },
+            maxTicksLimit: 6,
+            autoSkip: true,
+          },
+          grid: { display: false },
+        },
+        y: {
+          ...baseScaleOpts(),
+          ticks: { color: TICK_COLOR, font: { size: 7.5 }, maxTicksLimit: 4 },
+        }
+      }
+    }
+  });
+}
+
+function buildMiniChartsGrid() {
+  const grid = document.getElementById('miniChartsGrid');
+  grid.innerHTML = '';
+
+  MINI_CHART_DEFS.forEach((def, i) => {
+    const canvasId = `miniChart_${def.id}`;
+    const card = document.createElement('div');
+    card.className = 'mini-chart-card';
+    card.style.animationDelay = `${i * 60}ms`;
+    card.innerHTML = `
+      <div class="mini-chart-header">
+        <div>
+          <div class="mini-chart-name">${def.label}</div>
+          <div class="mini-chart-name-en">${def.labelEn}</div>
+        </div>
+        <div>
+          <div class="mini-chart-val" style="color:${def.currentColor}">${def.currentVal}</div>
+          <div class="mini-chart-threshold">${def.thresholdLabel}</div>
+        </div>
+      </div>
+      <div class="chart-container chart-container--mini">
+        <canvas id="${canvasId}"></canvas>
+      </div>
+    `;
+    grid.appendChild(card);
+    // Build chart after DOM insert
+    requestAnimationFrame(() => buildMiniChart(def, canvasId));
+  });
+}
+
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  // Small delay to let loading animation show
+  await new Promise(r => setTimeout(r, 1200));
+  document.getElementById('loading').classList.add('hidden');
+  // Load real data immediately
+  await loadData();
+  // Auto-refresh every 15 minutes
+  setInterval(loadData, 15 * 60 * 1000);
+});
+</script>
+</body>
+</html>
